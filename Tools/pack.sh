@@ -6,6 +6,9 @@ TEMP_PATH="${SRCROOT}/${TARGET_NAME}/tmp"
 # monkeyparser
 MONKEYPARSER="${MONKEYDEV_PATH}/bin/monkeyparser"
 
+# yololib
+YOLOLIB="${MONKEYDEV_PATH}/bin/yololib"
+
 # create ipa script
 CREATE_IPA="${MONKEYDEV_PATH}/bin/createIPA.command"
 
@@ -25,7 +28,10 @@ TARGET_APP_PUT_PATH="${SRCROOT}/${TARGET_NAME}/TargetApp"
 MONKEYDEV_INSERT_DYLIB=${MONKEYDEV_INSERT_DYLIB:=YES}
 MONKEYDEV_TARGET_APP=${MONKEYDEV_TARGET_APP:=Optional}
 MONKEYDEV_ADD_SUBSTRATE=${MONKEYDEV_ADD_SUBSTRATE:=YES}
+MONKEYDEV_ADD_DobbyX=${MONKEYDEV_ADD_DobbyX:=NO}
 MONKEYDEV_DEFAULT_BUNDLEID=${MONKEYDEV_DEFAULT_BUNDLEID:=NO}
+
+CONMAND_NAME=$1
 
 function isRelease() {
 	if [[ "${CONFIGURATION}" = "Release" ]]; then
@@ -149,6 +155,9 @@ function pack(){
 		if [[ ${MONKEYDEV_ADD_SUBSTRATE} != "YES" ]];then
 			rm -rf "${TARGET_APP_FRAMEWORKS_PATH}/libsubstrate.dylib"
 		fi
+		if [[ ${MONKEYDEV_ADD_DobbyX} != "YES" ]];then
+			rm -rf "${TARGET_APP_FRAMEWORKS_PATH}"/DobbyX.framework
+		fi
 		if isRelease; then
 			rm -rf "${TARGET_APP_FRAMEWORKS_PATH}"/RevealServer.framework
 			rm -rf "${TARGET_APP_FRAMEWORKS_PATH}"/libcycript*
@@ -171,9 +180,27 @@ function pack(){
 	APP_BINARY=`plutil -convert xml1 -o - ${BUILD_APP_PATH}/Info.plist | grep -A1 Exec | tail -n1 | cut -f2 -d\> | cut -f1 -d\<`
 
 	if [[ ${MONKEYDEV_INSERT_DYLIB} == "YES" ]];then
-		"$MONKEYPARSER" install -c load -p "@executable_path/Frameworks/lib""${TARGET_NAME}""Dylib.dylib" -t "${BUILD_APP_PATH}/${APP_BINARY}"
+        	# 使用yololib修改mach-o
+		# 添加libsubstrate.dylib
+		if [[ ${MONKEYDEV_ADD_SUBSTRATE} == "YES" ]];then
+			"$YOLOLIB" "${BUILD_APP_PATH}/${APP_BINARY}" "Frameworks/libsubstrate.dylib"
+		fi
+		# 添加DobbyX.framework
+		if [[ ${MONKEYDEV_ADD_DobbyX} == "YES" ]];then
+			"$YOLOLIB" "${BUILD_APP_PATH}/${APP_BINARY}" "Frameworks/DobbyX.framework/DobbyX"
+		fi
+		# 判断是否有手动添加的动态库名称需要写入load command, exp:"libsubstrate.dylib,Frameworks/libsubstrate.dylib,Frameworks/DobbyX.framework/DobbyX"
+		if [[ "${CONMAND_NAME}" != "" ]]; then
+    			local CUSTOM_INSERT_NAME_LIST_STRING="${CONMAND_NAME}"
+		local CUSTOM_INSERT_NAME_LIST=($(echo ${CUSTOM_INSERT_NAME_LIST_STRING} | sed 's/,/ /g'))
+		for CUSTOM_INSERT_NAME in ${CUSTOM_INSERT_NAME_LIST[@]}
+		do
+			"$YOLOLIB" "${BUILD_APP_PATH}/${APP_BINARY}" "${CUSTOM_INSERT_NAME}"
+		done
+		fi
+		"$YOLOLIB" "${BUILD_APP_PATH}/${APP_BINARY}" "Frameworks/lib""${TARGET_NAME}""Dylib.dylib"
 		"$MONKEYPARSER" unrestrict -t "${BUILD_APP_PATH}/${APP_BINARY}"
-
+		
 		chmod +x "${BUILD_APP_PATH}/${APP_BINARY}"
 	fi
 
