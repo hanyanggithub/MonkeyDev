@@ -306,21 +306,8 @@ if [[ "$1" ]]; then
 	branch="$1"
 fi
 
-#下载一些基础文件和模板文件
-downloadGithubTarball "https://codeload.github.com/AloneMonkey/MonkeyDev/tar.gz/$branch" "$MonkeyDevPath" "MonkeyDev base"
-downloadGithubTarball "https://codeload.github.com/AloneMonkey/MonkeyDev-Xcode-Templates/tar.gz/$branch" "$MonkeyDevPath/templates" "Xcode templates"
-
-#下载frida-ios-dump
-echo "Downloading frida-ios-dump from Github..."
-downloadFile "https://raw.githubusercontent.com/AloneMonkey/frida-ios-dump/3.x/dump.py" "$MonkeyDevPath/bin/dump.py"
-downloadFile "https://raw.githubusercontent.com/AloneMonkey/frida-ios-dump/3.x/dump.js" "$MonkeyDevPath/bin/dump.js"
-
 chmod +x "$MonkeyDevPath/bin/dump.py"
 
-#创建符号链接
-echo "Creating symlink to Xcode templates..."
-
-#$userHome/Library/Developer/Xcode/Templates/MonkeyDev linkto $MonkeyDevPath/templates
 userDevDir="$userHome/Library/Developer"
 userTemplatesDir="$userDevDir/Xcode/Templates"
 
@@ -336,30 +323,22 @@ ln -fhs "$MonkeyDevPath/templates" "$userTemplatesDir/MonkeyDev"
 
 #修改用户profile文件
 echo "Modifying Bash personal initialization file..."
-
 userBashProfileFile=`determineUserBashProfileFile`
 
 addToFileIfMissing "$userBashProfileFile" "^(export)? *MonkeyDevPath=.*" "export MonkeyDevPath=$MonkeyDevPath"
 addToFileIfMissing "$userBashProfileFile" "^(export)? *MonkeyDevDeviceIP=.*" "export MonkeyDevDeviceIP="
 addToFileIfMissing "$userBashProfileFile" "^(export)? *PATH=.*(\\\$MonkeyDevPath\\/bin|${MonkeyDevPath//\//\\/}\\/bin).*" "export PATH=$MonkeyDevPath/bin:\$PATH"
 
-#支持iphoneos command line tools
-iosSdkPlatformPath=`getSdkProperty iphoneos PlatformPath`
-macosSdkPlatformPath=`getSdkProperty macosx PlatformPath`
-
-specificationFile=$(cd $iosSdkPlatformPath/../../.. && pwd)/PlugIns/IDEiOSSupportCore.ideplugin/Contents/Resources/Embedded-Device.xcspec
-
+specificationFile=/Applications/Xcode.app/Contents/Developer/Library/Xcode/Plug-ins/XCBSpecifications.ideplugin/Contents/Resources/Embedded-Device.xcspec
 requireFile "$specificationFile" false
-
 #backup
 requireBackup "$specificationFile"
 
 hasPackageTypeForCommandLineTool=`doesFileContain "$specificationFile" 'com.apple.package-type.mach-o-executable'`
 hasProductTypeForCommandLineTool=`doesFileContain "$specificationFile" 'com.apple.product-type.tool'`
 
-macosxSDKSpecificationsPath=$macosSdkPlatformPath/Developer/Library/Xcode/Specifications
-packageTypesForMacOSXPath="$macosxSDKSpecificationsPath/MacOSX Package Types.xcspec"
-productTypesForMacOSXPath="$macosxSDKSpecificationsPath/MacOSX Product Types.xcspec"
+packageTypesForMacOSXPath="$MonkeyDevPath/Suportfiles/MacOSX Package Types.xcspec"
+productTypesForMacOSXPath="$MonkeyDevPath/Suportfiles//MacOSX Product Types.xcspec"
 
 requireFile "$packageTypesForMacOSXPath" false
 requireFile "$productTypesForMacOSXPath" false
